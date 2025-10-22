@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from sklearn.preprocessing import MinMaxScaler
 from app.utils.helpers import evaluate_predictions
 from app.config.settings import TIME_STEP, EPOCHS, BATCH_SIZE, MODEL_PATH
@@ -13,16 +13,15 @@ def create_lstm_model()-> Sequential:
         Sequential: Modelo LSTM compilado com otimizador Adam e perda MSE.
     """
     print("--- REQ: 2.1 Construção do Modelo ---")
-    modelo = Sequential()
-    
-    modelo.add(LSTM(50, return_sequences=True, input_shape=(TIME_STEP, 1)))
-    modelo.add(Dropout(0.2))
-
-    modelo.add(LSTM(50))
-    modelo.add(Dropout(0.2))
-
-    modelo.add(Dense(1)) 
-    
+    modelo = Sequential([
+        Input(shape=(TIME_STEP, 1)),
+        LSTM(50, return_sequences=True),
+        Dropout(0.2),
+        LSTM(50),
+        Dropout(0.2),
+        Dense(1)
+    ])
+ 
     modelo.compile(optimizer='adam', loss='mean_squared_error',metrics=['mae'])
     
     return modelo

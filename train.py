@@ -11,7 +11,12 @@ load_dotenv()
 
 if __name__ == "__main__":
     print("\n")
-    AMBIENTE = os.getenv("PIPELINE_AMBIENTE", "dev")  # "dev" ou "prd"
+    AMBIENTE = os.getenv("PIPELINE_AMBIENTE", "dev")
+    
+    """
+    Número que define o ponto inicial da aleatoriedade,
+    garantindo reprodutibilidade dos resultados em diferentes execuções e ambientes durante os testes.
+    """
     SEED = int(os.getenv("SEED", 42))
 
     if AMBIENTE == "dev":

@@ -20,13 +20,13 @@ def load_and_preprocess_data() -> tuple[
     Returns:
         (X_treino, X_teste, Y_treino, Y_teste, scaler):
             Arrays numpy com dados de treino/teste e o MinMaxScaler usado.
-        Retorna (None, None, None, None, None) em caso de erro.
+            Retorna (None, None, None, None, None) em caso de erro.
     """
     print(f"--- 1. Coletando dados para {TICKER} ---")
     end_date = datetime.now().strftime('%Y-%m-%d')
     
     try:
-        dados_originais = yf.download(TICKER, start=START_DATE, end=end_date)
+        dados_originais = yf.download(TICKER, start=START_DATE, end=end_date, auto_adjust=True)
         if dados_originais.empty:
             raise ValueError("Dataset vazio. Verifique o ticker.")
     except Exception as e:
@@ -35,7 +35,8 @@ def load_and_preprocess_data() -> tuple[
 
     # 1. Seleção da feature e Escalamento
     dados_fechamento = dados_originais[['Close']].copy()
-    scaler = MinMaxScaler(feature_range=(0, 1))
+    # Scaler: normaliza os dados para a faixa [0, 1] e melhora o desempenho do modelo
+    scaler = MinMaxScaler(feature_range=(0, 1)) 
     dados_escalonados = scaler.fit_transform(dados_fechamento['Close'].values.reshape(-1, 1))
 
     # 2. Estruturação em Sequências (X e Y)
