@@ -1,18 +1,17 @@
-# app/schemas/prediction_schema.py
+from pydantic import BaseModel, Field
 
-from pydantic import BaseModel
-from app.config.settings import TIME_STEP
-
-class HistoricalPrices(BaseModel):
+class PredictionRequest(BaseModel):
     """
-    Schema de entrada: lista de 60 preços (R$)
+    Schema de entrada: pede apenas o ticker.
     """
-    prices: list[float]
+    ticker: str = Field(..., example="PETR4.SA", description="Código da ação (Ticker) a ser previsto.")
 
 class PredictionResponse(BaseModel):
     """
-    Schema de saída da previsão.
+    Schema de saída da previsão de preço da ação.
     """
     ticker: str
+    ultimo_preco: float
     previsao_proximo_dia: float
+    variacao_percentual: float
     unidade: str = "R$"
