@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.schemas.prediction_schema import PredictionRequest, PredictionResponse
+from app.schemas.prediction_schema import PredictionResponse
 from app.config.settings import MODEL_PATH, SCALER_PATH, TIME_STEP
-import numpy as np
-import joblib
+from app.config.security import verify_token
 from tensorflow.keras.models import load_model
-import yfinance as yf
 from datetime import datetime, timedelta
+import joblib
+import yfinance as yf
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,15 +28,16 @@ def get_ml_artifacts():
         raise HTTPException(status_code=503, detail="Serviço indisponível. Artefatos de ML não carregados.")
     return MODEL, SCALER
 
-@router.post("/predict/", response_model=PredictionResponse)
-def predict_price(request: PredictionRequest, artifacts: tuple = Depends(get_ml_artifacts)):
+@router.post("/predict/petr4", response_model=PredictionResponse)
+def predict_price(artifacts: tuple = Depends(get_ml_artifacts), token: str = Depends(verify_token)):
     """
-    Endpoint principal para prever o preço de fechamento do próximo dia,
-    buscando os dados históricos necessários via yfinance.
+    Endpoint responsável por prever o preço de fechamento do próximo pregão (D+1)
+    da ação PETR4.SA, utilizando um modelo LSTM previamente treinado com base
+    em janelas temporais deslizantes de 60 dias consecutivos de histórico.
     """
     model, scaler = artifacts
     
-    ticker = request.ticker.upper()
+    ticker = "PETR4.SA" # Valor Fixo, Empresa utilizada para o treinamento.
     
     # --- 1. Busca e Coleta dos Dados Recentes (via yfinance) ---
     
@@ -54,6 +56,9 @@ def predict_price(request: PredictionRequest, artifacts: tuple = Depends(get_ml_
             
         # Pega a última janela de tempo (60 dias) para previsão
         recent_prices = data['Close'].tail(TIME_STEP).values
+
+        #Obtendo a ultima data do fechamento
+        ultima_data = data.index[-1].strftime("%Y-%m-%d")
         
         if len(recent_prices) != TIME_STEP:
              raise HTTPException(
@@ -86,10 +91,9 @@ def predict_price(request: PredictionRequest, artifacts: tuple = Depends(get_ml_
     ultimo_preco = recent_prices[-1]
     variacao_pct = ((prediction_original - ultimo_preco) / ultimo_preco) * 100
 
-    #logger.info(f"{ticker}: atual={ultimo_preco:.2f}, previsto={prediction_original:.2f}, variação={variacao_pct:.2f}%")
-
     return PredictionResponse(
         ticker=ticker,
+        ultima_data=ultima_data,
         ultimo_preco=round(float(ultimo_preco), 2),
         previsao_proximo_dia=round(float(prediction_original), 2),
         variacao_percentual=round(float(variacao_pct), 2),
