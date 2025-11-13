@@ -4,14 +4,28 @@ from app.config.settings import MODEL_PATH, SCALER_PATH, TIME_STEP
 from app.config.security import verify_token
 from tensorflow.keras.models import load_model
 from datetime import datetime, timedelta
+from prometheus_client import Counter, Histogram, Gauge
 import joblib
 import yfinance as yf
 import logging
+import psutil
+import time
+
 
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+# --- Métricas Prometheus ---
+PREDICT_REQUESTS = Counter(
+    "predict_requests_total", "Número total de requisições ao endpoint /predict/petr4"
+)
+PREDICT_LATENCY = Histogram(
+    "predict_latency_seconds", "Tempo de resposta do endpoint /predict/petr4 (segundos)"
+)
+CPU_USAGE = Gauge("predict_cpu_usage_percent", "Uso de CPU (%) durante a predição")
+MEM_USAGE = Gauge("predict_memory_usage_percent", "Uso de memória (%) durante a predição")
+
 
 # Carregamento Global dos Artefatos de ML (MODEL e SCALER)
 try:
@@ -35,12 +49,16 @@ def predict_price(artifacts: tuple = Depends(get_ml_artifacts), token: str = Dep
     da ação PETR4.SA, utilizando um modelo LSTM previamente treinado com base
     em janelas temporais deslizantes de 60 dias consecutivos de histórico.
     """
+    start_time = time.time()
+    PREDICT_REQUESTS.inc()  # incrementa contagem de requisições
+
     model, scaler = artifacts
     
     ticker = "PETR4.SA" # Valor Fixo, Empresa utilizada para o treinamento.
-    
-    # --- 1. Busca e Coleta dos Dados Recentes (via yfinance) ---
-    
+
+    CPU_USAGE.set(psutil.cpu_percent(interval=None))
+    MEM_USAGE.set(psutil.virtual_memory().percent)
+       
     # Buscando período seguro (Os últimos 120 dias corridos).
     end_date = datetime.now().strftime('%Y-%m-%d')
     start_date = (datetime.now() - timedelta(days=100)).strftime('%Y-%m-%d')
@@ -67,29 +85,27 @@ def predict_price(artifacts: tuple = Depends(get_ml_artifacts), token: str = Dep
             )
 
     except Exception as e:
-        # Erro de conexão, ticker inválido, etc.
         raise HTTPException(
             status_code=500, 
             detail=f"Falha ao buscar dados históricos via yfinance para {ticker}. Erro: {str(e)}"
         )
 
-    # --- 2. Processamento ---
-    # 1. Formatar para 2D (scaler)
     input_data = recent_prices.reshape(-1, 1)
-    
-    # 2. Escalonamento
     scaled_input = scaler.transform(input_data)
-    
-    # 3. Reshape para 3D da LSTM
     X_input = scaled_input.reshape(1, TIME_STEP, 1)
 
-    # 4. Previsão e Desnormalização
+    # Previsão e Desnormalização
     scaled_prediction = model.predict(X_input)
     prediction_original = scaler.inverse_transform(scaled_prediction)[0][0]
 
-    # 5. Retorno
+    # Retorno da predição
     ultimo_preco = recent_prices[-1]
     variacao_pct = ((prediction_original - ultimo_preco) / ultimo_preco) * 100
+
+    # Finaliza medição de tempo
+    elapsed = time.time() - start_time
+    PREDICT_LATENCY.observe(elapsed)
+    logger.info(f"Tempo de resposta /predict/petr4: {elapsed:.3f}s")
 
     return PredictionResponse(
         ticker=ticker,
