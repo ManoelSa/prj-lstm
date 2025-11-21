@@ -4,4 +4,3 @@ venv/
 tests/
 __pycache__/
 create_structure.py
-teste_exec.py
