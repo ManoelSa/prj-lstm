@@ -4,6 +4,8 @@ from app.config import security
 from starlette.responses import Response
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
+# REQUISITO 4.1: Criação de API
+
 # Inicialização do FastAPI
 app = FastAPI(
     title="API PETR4",

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+# REQUISITO 5: Escalabilidade e Monitoramento
 # --- Métricas Prometheus ---
 PREDICT_REQUESTS = Counter(
     "predict_requests_total", "Número total de requisições ao endpoint /predict/petr4"
